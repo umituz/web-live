@@ -1,6 +1,6 @@
 {
   "name": "@umituz/web-live",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Live rooms for web apps — polling-based signaling, WebRTC peer mesh, presence roster, media device management and segmented composite recording, transport-agnostic so any backend can host it.",
   "type": "module",
   "main": "./src/index.ts",

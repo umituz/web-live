@@ -22,6 +22,7 @@ billing and product rules.
 | Mailbox polling loop (1s handshake / 4s steady / 8s hidden floor) | `SignalTransport` — atomic per-client claim endpoints |
 | Star-topology mesh (hub election, epoch-guarded offers, non-trickle ICE, screen-share renegotiation, hub relay) | ICE servers (STUN/TURN list) |
 | Presence heartbeat (8s beat, roster parsing, 409 room-full) | `PresenceTransport` — slot PUT returning the roster |
+| Audience presence (8s beat while visible, hidden tabs drop out via server TTL, roster + count) | `AudienceTransport` — beat PUT returning the roster |
 | Room-doc sync (4s/8s adaptive poll, 30s backoff, optimistic chat with retry+rollback, debounced notes with edit-lock) | `RoomDocTransport` — six REST endpoints |
 | Composite recorder (canvas composite + full-room audio mix, 120s standalone parts, retry chain, sendBeacon finish on pagehide) | `RecorderEndpoints` — start/part/finish + beacon URL |
 | Local media (single-acquisition mic/cam with in-place toggles, screen share) | nothing — pure browser APIs |
