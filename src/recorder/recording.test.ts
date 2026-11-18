@@ -53,16 +53,16 @@ describe('parseCompositeRecording', () => {
 
   it('drops malformed entries and out-of-bound parts', () => {
     expect(parseCompositeRecording('nope')).toBeNull()
-    expect(parseCompositeRecording({ parts: [] })).toBeNull() // no id
+    expect(parseCompositeRecording({ parts: [] })).toBeNull()
     const rec = parseCompositeRecording({
       id: 'rec-2',
       startedAt: 0,
       parts: [
-        { n: 0, size: 10, at: 0, contentType: 'video/webm' }, // n below 1
+        { n: 0, size: 10, at: 0, contentType: 'video/webm' },
         { n: RECORDING_MAX_PARTS + 1, size: 10, at: 0, contentType: 'video/webm' },
         { n: 2, size: RECORDING_PART_MAX_BYTES + 1, at: 0, contentType: 'video/webm' },
         { n: 3, size: -1, at: 0, contentType: 'video/webm' },
-        { n: 4, size: 12, at: 0, contentType: 'video/webm' }, // valid
+        { n: 4, size: 12, at: 0, contentType: 'video/webm' },
       ],
     })
     expect(rec?.parts).toEqual([{ n: 4, size: 12, at: 0 }])

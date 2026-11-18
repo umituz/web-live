@@ -11,11 +11,6 @@ export interface TransportStatsState {
 
 const POLL_MS = 5_000
 
-/**
- * Pure mapping from transport counters to a three-state badge value.
- * Thresholds sit between "imperceptible" and "annoying" for real-time calls:
- * below ~150ms RTT / 2% loss nobody notices; past ~400ms / 8% it hurts.
- */
 export function deriveQuality(input: {
   rttMs: number | null
   jitterMs: number | null
@@ -30,7 +25,6 @@ export function deriveQuality(input: {
   return 'poor'
 }
 
-/** Picks the worst-case counters across the reports we care about. */
 export function summarizeStats(
   reports: RTCStatsReport[],
 ): { rttMs: number | null; jitterMs: number | null; lossRatio: number | null } {
@@ -58,10 +52,6 @@ export function summarizeStats(
   return { rttMs, jitterMs, lossRatio }
 }
 
-/**
- * Samples getStats() on every live peer connection every 5s and reduces the
- * counters to one room-wide quality badge.
- */
 export function useTransportStats(
   pcsRef: React.RefObject<Map<string, RTCPeerConnection>>,
   enabled: boolean,
@@ -86,7 +76,7 @@ export function useTransportStats(
         const summary = summarizeStats(reports)
         setState({ ...summary, quality: deriveQuality(summary) })
       } catch {
-        // stats flaked out — keep the previous sample
+
       }
     }
     void sample()

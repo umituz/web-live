@@ -17,40 +17,29 @@ import type { RoomParticipant } from '../core'
 import { useTransportStats } from './useTransportStats'
 import type { TransportStatsState } from './useTransportStats'
 
-/** Default STUN-only ICE config; apps with a TURN host override via `iceServers`. */
 export const ICE_SERVERS: RTCIceServer[] = [{ urls: 'stun:stun.l.google.com:19302' }]
-/** Non-trickle ICE: wait for full gathering, but never longer than this. */
+
 const ICE_GATHER_TIMEOUT_MS = 2_500
-/** How long a negotiation waits for the local permission prompt to settle. */
+
 const LOCAL_STREAM_WAIT_MS = 30_000
-/** Guest "hello" throttle — nudges the hub to offer without spamming. */
+
 const HELLO_THROTTLE_MS = 5_000
 
 type EnsureMode = 'auto' | 'force' | 'renegotiate'
 
 export interface PeerMeshState {
-  /** Remote media per peer clientId (star topology: guests see only the hub). */
+
   remoteStreams: Record<string, MediaStream>
   peerStates: Record<string, PeerState>
   connection: RoomConnection
-  /**
-   * The newest video m-line a peer is sending. Senders append camera first
-   * and screen last, so the last video track is the shared screen while one
-   * is active — the one the presentation layout should show.
-   */
+
   getLastVideoTrack: (peerId: string) => MediaStreamTrack | null
-  /** Sampled transport quality (nulls until the first successful sample). */
+
   stats: TransportStatsState
-  /** Manual recovery: hub re-offers everyone, guest nudges the hub. */
+
   restart: () => void
 }
 
-/**
- * Deterministic hub election. Host clientIds in lexicographic order — the
- * first entry is the room's hub, so every participant computes the same
- * winner without a vote and a co-hosting admin simply degrades to a guest.
- * Empty when no host is present (nothing negotiates until one joins).
- */
 export function electHubClientIds(participants: readonly RoomParticipant[]): string[] {
   return participants
     .filter((entry) => entry.isHost)
@@ -79,18 +68,6 @@ function descriptionOf(desc: RTCSessionDescription | null): { type: string; sdp:
   return { type: desc.type, sdp: desc.sdp }
 }
 
-/**
- * Star-topology WebRTC mesh. The room's hub (the lexicographically-first
- * host clientId — deterministic, so a co-hosting admin degrades to a guest)
- * offers to every other participant; guests answer and otherwise stay dark.
- * All negotiation is non-trickle: one offer/answer exchange carries the
- * complete ICE candidate set (gather-complete or a 2.5s timeout, whichever
- * first), so each side sends exactly one message per negotiation round.
- *
- * Screen sharing reuses the same peer connections: the sharer appends the
- * capture track (and the hub relays a guest's capture to the other guests)
- * through a renegotiation round — no connection is torn down.
- */
 export function usePeerMesh({
   transport,
   enabled,
@@ -102,22 +79,18 @@ export function usePeerMesh({
   screenSharerId,
   iceServers,
 }: {
-  /**
-   * Signaling mailbox bound to the room (see createHttpSignalTransport).
-   * Null while unjoined: nothing negotiates and every send resolves false,
-   * matching the roomless guard the app-side hook used to carry.
-   */
+
   transport: SignalTransport | null
   enabled: boolean
   clientId: string
   participants: RoomParticipant[]
   localStream: MediaStream | null
   mediaBlocked: boolean
-  /** Local screen capture, when this client is sharing. */
+
   screenStream?: MediaStream | null
-  /** Who holds the room's share slot (from the polled room doc). */
+
   screenSharerId?: string | null
-  /** STUN/TURN list overriding ICE_SERVERS. */
+
   iceServers?: RTCIceServer[]
 }): PeerMeshState {
   const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream>>({})
@@ -148,13 +121,10 @@ export function usePeerMesh({
   const screenStreamRef = useRef<MediaStream | null>(screenStream ?? null)
   screenStreamRef.current = screenStream ?? null
   const relayTrackRef = useRef<MediaStreamTrack | null>(null)
-  // Read through a ref so an inline `iceServers` array literal can't churn
-  // the callback identities below — the app-side original froze a module
-  // constant, and the renegotiation effect is keyed on ensurePeer identity.
+
   const iceServersRef = useRef<RTCIceServer[]>(iceServers ?? ICE_SERVERS)
   iceServersRef.current = iceServers ?? ICE_SERVERS
 
-  // Deterministic hub election: sort host clientIds, the first is the hub.
   const hostClientIds = useMemo(() => electHubClientIds(participants), [participants])
   const hubClientId = hostClientIds[0] ?? ''
   hubIdRef.current = hubClientId
@@ -184,7 +154,7 @@ export function usePeerMesh({
       try {
         pc.close()
       } catch {
-        // already closed
+
       }
     }
     peerStreamsRef.current.delete(peerId)
@@ -233,7 +203,7 @@ export function usePeerMesh({
     pc.onconnectionstatechange = () => {
       setPeerStates((prev) => ({ ...prev, [peerId]: pc.connectionState as PeerState }))
       if (pc.connectionState === 'failed' && isHubRef.current) {
-        // Hub side: a dead transport recovers with a fresh epoch offer.
+
         void ensurePeerRef.current(peerId, 'force')
       }
     }
@@ -242,7 +212,6 @@ export function usePeerMesh({
     return pc
   }, [bumpRemoteStreams, ensurePeerStream])
 
-  /** Every local track that should be on the wire right now. */
   const collectLocalTracks = useCallback((): MediaStreamTrack[] => {
     const tracks: MediaStreamTrack[] = []
     for (const source of [localStreamRef.current, screenStreamRef.current]) {
@@ -272,7 +241,7 @@ export function usePeerMesh({
           pc.removeTrack(sender)
           removed = true
         } catch {
-          // sender already gone
+
         }
       }
     }
@@ -299,9 +268,6 @@ export function usePeerMesh({
     }
   }, [])
 
-  // Offer path (hub only). Modes: 'auto' skips healthy, complete rounds;
-  // 'renegotiate' always offers on the live connection (screen share); 'force'
-  // tears the pc down and bumps the epoch (recovery, stale-round override).
   const ensurePeer = useCallback(
     async (peerId: string, mode: EnsureMode = 'auto') => {
       if (!transport || !isHubRef.current) return
@@ -320,12 +286,12 @@ export function usePeerMesh({
           !missingLocalTracks(pc) &&
           !hasEndedSenders(pc)
         ) {
-          return // healthy and complete — nothing to negotiate
+          return
         }
-        if (pc.signalingState === 'have-local-offer') return // round already in flight
+        if (pc.signalingState === 'have-local-offer') return
         await waitForLocalStream()
         const fresh = pcsRef.current.get(peerId)
-        if (!fresh || fresh !== pc) return // closed/replaced while waiting
+        if (!fresh || fresh !== pc) return
         removeEndedSenders(fresh)
         syncLocalTracks(fresh)
         const epoch = epochsRef.current[peerId] ?? 1
@@ -356,7 +322,6 @@ export function usePeerMesh({
   )
   ensurePeerRef.current = ensurePeer
 
-  // Answer path (guest only).
   const handleOffer = useCallback(
     async (signal: LiveSignal) => {
       if (answerInFlightRef.current.has(signal.from)) return
@@ -394,7 +359,7 @@ export function usePeerMesh({
 
   const handleAnswer = useCallback(async (signal: LiveSignal) => {
     const pc = pcsRef.current.get(signal.from)
-    // A late answer for an already-superseded round is dropped on the floor.
+
     if (!pc || pc.signalingState !== 'have-local-offer') return
     if (!isUsableDescription(signal.description)) return
     try {
@@ -419,14 +384,13 @@ export function usePeerMesh({
         else if (signal.kind === 'renegotiate') void ensurePeer(signal.from, 'renegotiate')
         return
       }
-      // Guest side: the hub drives; offers only ever come from it.
+
       if (signal.from !== hubIdRef.current) return
       if (signal.kind === 'offer') void handleOffer(signal)
     },
     [ensurePeer, handleAnswer, handleOffer],
   )
 
-  // Signaling cadence: hot while anyone is expected but not yet connected.
   const peersExpected = isHub
     ? participants.filter((entry) => entry.clientId !== clientId).length
     : hubClientId.length > 0 && hubClientId !== clientId
@@ -439,7 +403,6 @@ export function usePeerMesh({
   const { send } = useSignalMailbox({ clientId, transport, enabled, fast, onSignal: handleSignal })
   sendRef.current = send
 
-  // Hub: keep one peer connection per fresh participant.
   useEffect(() => {
     if (!enabled || !isHub) return
     const peers = participants.filter((entry) => entry.clientId !== clientId)
@@ -449,8 +412,6 @@ export function usePeerMesh({
     }
   }, [participants, enabled, isHub, clientId, ensurePeer, closePeer, localStream])
 
-  // Guest: nudge the hub for an offer as soon as it appears in presence (the
-  // heartbeat alone would otherwise delay the handshake by up to 8s).
   useEffect(() => {
     if (!enabled || isHub || !transport || !hubClientId || hubClientId === clientId) return
     const known = pcsRef.current.has(hubClientId)
@@ -466,17 +427,12 @@ export function usePeerMesh({
     return order[order.length - 1] ?? null
   }, [])
 
-  // Hub relay: while a GUEST holds the share slot, the hub re-sends its
-  // capture to every other guest (star topology — guests never connect
-  // directly). Plain recompute on every render: remote-stream bumps are what
-  // trigger renders, and the underlying lookup is a cheap ref read.
   const relayTrack =
     enabled && isHub && screenSharerId && screenSharerId !== clientId
       ? getLastVideoTrack(screenSharerId)
       : null
   relayTrackRef.current = relayTrack
 
-  // Screen capture starts/stops (either side) → one renegotiation round.
   useEffect(() => {
     if (!enabled || !transport) return
     if (isHub) {
@@ -484,10 +440,9 @@ export function usePeerMesh({
     } else if (hubClientId && hubClientId !== clientId) {
       void sendRef.current(hubClientId, { kind: 'renegotiate', description: null })
     }
-    // Both start and stop must renegotiate (add m-line / retire ended track).
+
   }, [enabled, transport, isHub, hubClientId, clientId, screenStream, relayTrack, ensurePeer])
 
-  // Close everything on leave.
   useEffect(() => {
     const pcs = pcsRef.current
     return () => {
@@ -495,7 +450,7 @@ export function usePeerMesh({
         try {
           pc.close()
         } catch {
-          // already closed
+
         }
       }
       pcs.clear()
@@ -510,7 +465,6 @@ export function usePeerMesh({
     }
   }, [ensurePeer])
 
-  // Cheap derived value — recomputed every render without a memo guard.
   const connection = summarizeConnection(states)
   const stats = useTransportStats(pcsRef, enabled)
 

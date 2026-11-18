@@ -5,23 +5,17 @@ import { PRESENCE_BEAT_MS } from '../core/constants'
 import type { PresenceTransport } from './transport'
 
 export interface RoomPresenceState {
-  /** This client's mailbox address (shared with the WebRTC layer). */
+
   clientId: string
   participants: RoomParticipant[]
-  /** Other participants (excluding this client) with a raised hand. */
+
   raisedHands: RoomParticipant[]
   handRaised: boolean
   toggleHand: () => void
-  /** True when the server rejected the heartbeat because the room is full. */
+
   roomFull: boolean
 }
 
-/**
- * Room presence over heartbeats: beats this client's state (clientId-keyed,
- * so two tabs of the same user count separately) every 8s and receives the
- * fresh participant list back. Hand raises are synced through the same
- * channel and flush immediately instead of waiting for the next beat.
- */
 export function usePresence({
   enabled,
   micOn,
@@ -32,17 +26,15 @@ export function usePresence({
   enabled: boolean
   micOn: boolean
   camOn: boolean
-  /** Shared identity so signaling and media address the same presence slot. */
+
   clientId: string
-  /** Bound to one room by the caller (see createHttpPresenceTransport). */
+
   transport: PresenceTransport | null
 }): RoomPresenceState {
   const [participants, setParticipants] = useState<RoomParticipant[]>([])
   const [handRaised, setHandRaised] = useState(false)
   const [roomFull, setRoomFull] = useState(false)
 
-  // The heartbeat always sends the CURRENT state, so the toggles live in refs
-  // that the interval closure can read without being re-created.
   const stateRef = useRef({ handRaised, micOn, camOn })
   stateRef.current = { handRaised, micOn, camOn }
 
@@ -63,8 +55,7 @@ export function usePresence({
         setRoomFull(true)
         return
       }
-      // 401/403 (room closed / kicked) and network errors keep the last
-      // snapshot; the next beat retries.
+
     }
   }, [transport, clientId])
 
@@ -74,9 +65,6 @@ export function usePresence({
     const timer = setInterval(() => void beat(), PRESENCE_BEAT_MS)
     return () => clearInterval(timer)
   }, [beat, enabled, transport])
-
-  // No explicit leave on unmount: the server stamps `at` itself, so a goodbye
-  // beat cannot backdate the entry — the 25s TTL prune handles departures.
 
   const toggleHand = useCallback(() => {
     stateRef.current = { ...stateRef.current, handRaised: !stateRef.current.handRaised }

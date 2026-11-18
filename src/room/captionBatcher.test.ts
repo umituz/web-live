@@ -34,7 +34,7 @@ describe('captionBatchDue', () => {
   it('waits until five lines queue up', () => {
     let state = initialCaptionBatcher()
     for (const id of ['a', 'b', 'c', 'd']) state = pushCaption(state, item(id))
-    // Still inside the window and under the size trigger → keep waiting.
+
     expect(captionBatchDue(state, CAPTION_BATCH_WINDOW_MS - 1)).toBeNull()
     state = pushCaption(state, item('e'))
     const due = captionBatchDue(state, 100)

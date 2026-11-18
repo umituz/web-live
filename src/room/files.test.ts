@@ -32,7 +32,7 @@ describe('sanitizeFileName', () => {
   it('strips paths, control chars and quotes', () => {
     expect(sanitizeFileName('/etc/passwd')).toBe('passwd')
     expect(sanitizeFileName('C:\\Users\\umit\\plan.pdf')).toBe('plan.pdf')
-    // Each forbidden char becomes a space; dangerous bytes never survive.
+
     expect(sanitizeFileName('a<b>c:"d"|e?f*.txt')).toBe('a b c d e f .txt')
   })
 

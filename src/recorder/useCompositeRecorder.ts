@@ -11,10 +11,6 @@ import {
 export type CompositeRecorderFailure = 'unsupported' | 'startFailed'
 export type CompositeRecorderStatus = 'idle' | 'starting' | 'recording' | 'stopping'
 
-/**
- * Reject `uploadPart` with this when the failure is permanent (4xx other
- * than 429): the hook stops retrying the part immediately.
- */
 export class PermanentUploadError extends Error {
   constructor(message?: string) {
     super(message ?? 'permanent upload failure')
@@ -22,58 +18,29 @@ export class PermanentUploadError extends Error {
   }
 }
 
-/**
- * The one seam between the recorder and the app's backend. Bind it per room
- * (close over the room id in the URL strings) — the hook owns every capture
- * concern and only ever calls these four.
- */
 export interface CompositeRecorderEndpoints {
-  /**
-   * Create the recording server-side and resolve its id. Throwing (network
-   * or non-2xx) maps to the hook's 'startFailed' failure mode.
-   */
+
   start(): Promise<{ recording: { id: string } }>
-  /**
-   * Upload ONE part as a single POST and resolve true on 2xx, false on
-   * failure (throw or non-ok). Keep it a one-shot request — the RETRY LOOP
-   * lives in the hook, so an adapter that also retries would multiply the
-   * attempt count. Raw-fetch semantics to mirror: same-origin credentials
-   * (`credentials: 'same-origin'`) so the session cookie rides along, and
-   * `Content-Type` = the passed `contentType` (the negotiated media mime,
-   * e.g. video/webm;codecs=vp8,opus) — a raw media body, not multipart and
-   * not JSON.
-   *
-   * A failure the app KNOWS is permanent (4xx other than 429 — bad part
-   * number, too large, auth) should reject with `PermanentUploadError` so
-   * the hook skips the remaining attempts instead of retrying a lost cause.
-   */
+
   uploadPart(input: {
     recordingId: string
     part: number
     blob: Blob
     contentType: string
   }): Promise<boolean>
-  /**
-   * Graceful finish for the stop() path. Must be idempotent: it can race the
-   * pagehide beacon hitting the same endpoint (see finishBeaconUrl).
-   */
+
   finish(recordingId: string): Promise<unknown>
-  /**
-   * URL of the same idempotent finish endpoint for the unload path —
-   * navigator.sendBeacon takes a URL, not a function, so the app hands the
-   * finish route over as a string. Keep it a same-origin path so the beacon
-   * carries the session cookie.
-   */
+
   finishBeaconUrl(recordingId: string): string
 }
 
 export interface UseCompositeRecorder {
   status: CompositeRecorderStatus
-  /** Wall-clock seconds of the current capture (ticks once per second). */
+
   seconds: number
-  /** Parts queued for upload right now (uploads run sequentially). */
+
   pendingUploads: number
-  /** Parts that permanently failed to upload — the recording has a gap. */
+
   uploadFailures: number
   failure: CompositeRecorderFailure | null
   start: () => void
@@ -83,17 +50,6 @@ export interface UseCompositeRecorder {
 const UPLOAD_ATTEMPTS = 3
 const DRAW_INTERVAL_MS = 100
 
-/**
- * Host-side composite room recording. The active video (shared screen,
- * else the host camera) is composited onto an offscreen canvas while an
- * AudioContext mixes every track in the room (own mic + screen audio + all
- * remotes) — nobody re-records their own echo because the mix never routes
- * back to the speakers.
- *
- * MediaRecorder runs FULL start/stop cycles per ~2min part: timeslice chunks
- * are EBML fragments that cannot play standalone, while every stopped blob
- * is a complete file. Parts upload sequentially as they finalize.
- */
 export function useCompositeRecorder({
   enabled,
   webcamStream,
@@ -103,7 +59,7 @@ export function useCompositeRecorder({
   myClientId,
   endpoints,
 }: {
-  /** Host-only: students never record. */
+
   enabled: boolean
   webcamStream: MediaStream | null
   screenStream: MediaStream | null
@@ -118,10 +74,6 @@ export function useCompositeRecorder({
   const [uploadFailures, setUploadFailures] = useState(0)
   const [failure, setFailure] = useState<CompositeRecorderFailure | null>(null)
 
-  // Live inputs: the draw loop must always see the CURRENT streams, not the
-  // ones captured at start() — screen share can begin/end mid-recording.
-  // Endpoints get the same treatment so apps can pass an inline object
-  // without churning every callback below.
   const inputsRef = useRef({ webcamStream, screenStream, remoteStreams, screenSharerId, myClientId })
   inputsRef.current = { webcamStream, screenStream, remoteStreams, screenSharerId, myClientId }
   const endpointsRef = useRef(endpoints)
@@ -147,7 +99,7 @@ export function useCompositeRecorder({
   const activeVideoStream = (): MediaStream | null => {
     const { webcamStream: cam, screenStream: scr, remoteStreams: remotes, screenSharerId: sharer, myClientId: me } =
       inputsRef.current
-    // Mirror the stage: whoever holds the share slot is the big picture.
+
     if (sharer && sharer === me && scr?.getVideoTracks().length) return scr
     if (sharer && sharer !== me && remotes[sharer]?.getVideoTracks().length) return remotes[sharer]
     return cam
@@ -171,7 +123,7 @@ export function useCompositeRecorder({
     }
     const video = videoElRef.current
     if (video && video.videoWidth > 0 && video.videoHeight > 0) {
-      // Object-fit contain: preserve aspect, center, letterbox the rest.
+
       const scale = Math.min(canvas.width / video.videoWidth, canvas.height / video.videoHeight)
       const width = video.videoWidth * scale
       const height = video.videoHeight * scale
@@ -179,7 +131,6 @@ export function useCompositeRecorder({
     }
   }, [])
 
-  /** Adds/removes audio source nodes so joiners mid-recording are captured. */
   const rewireAudio = useCallback(() => {
     const audioCtx = audioCtxRef.current
     const dest = mixDestRef.current
@@ -204,15 +155,14 @@ export function useCompositeRecorder({
         node.connect(dest)
         wiredTracksRef.current.set(track.id, node)
       } catch {
-        // A dead track (peer left between snapshot and wire) — skip it.
+
       }
     }
   }, [])
 
   const uploadPart = useCallback(
     async (recordingId: string, part: number, blob: Blob) => {
-      // The retry cadence is the hook's generic value: adapters stay one-shot
-      // POSTs, and three spaced attempts bound the damage of a flaky link.
+
       for (let attempt = 1; attempt <= UPLOAD_ATTEMPTS; attempt += 1) {
         try {
           const ok = await endpointsRef.current.uploadPart({
@@ -223,11 +173,9 @@ export function useCompositeRecorder({
           })
           if (ok) return
         } catch (err) {
-          // The app flagged this failure as permanent (e.g. 4xx other than
-          // 429): retrying a rejected part only burns two more POSTs.
+
           if (err instanceof PermanentUploadError) break
-          // Any other throw is a transport hiccup — fall through to the
-          // backoff and retry like a false resolve.
+
         }
         await new Promise((resolve) => setTimeout(resolve, 750 * attempt))
       }
@@ -262,7 +210,7 @@ export function useCompositeRecorder({
     if (!recorder || !activeRef.current) return
     recorder.start()
     segmentTimerRef.current = setTimeout(() => {
-      // Full stop → the blob is a standalone file; a new segment follows.
+
       if (recorderRef.current?.state === 'recording') recorderRef.current.stop()
     }, RECORDING_SEGMENT_MS)
   }, [])
@@ -317,9 +265,7 @@ export function useCompositeRecorder({
 
         const canvasStream = canvas.captureStream(10)
         canvasStreamRef.current = canvasStream
-        // captureStream(10) always yields exactly one video track; the guard
-        // only keeps noUncheckedIndexedAccess honest (a missing track would
-        // have thrown inside the MediaStream constructor anyway).
+
         const canvasVideoTrack = canvasStream.getVideoTracks()[0]
         if (!canvasVideoTrack) throw new Error('canvas capture produced no video track')
         const combined = new MediaStream([
@@ -333,8 +279,7 @@ export function useCompositeRecorder({
         })
         recorder.ondataavailable = (event) => {
           if (event.data.size === 0) return
-          // Captured at creation: stop() nulls the ref before the FINAL
-          // dataavailable fires, and that last part must still upload.
+
           const uploadRecordingId = res.recording.id
           const part = segmentPartRef.current
           setPendingUploads((prev) => prev + 1)
@@ -380,21 +325,19 @@ export function useCompositeRecorder({
     try {
       if (recorder && recorder.state !== 'inactive') recorder.stop()
     } catch {
-      // Already inactive — nothing to flush.
+
     }
     teardownMachinery()
     recordingIdRef.current = null
     setStatus('idle')
     if (recordingId) {
-      // Last part may still be uploading; finish clears the consent flag
-      // server-side and is retried by the room leaving this state anyway.
+
       void endpointsRef
         .current.finish(recordingId)
         .catch(() => {})
     }
   }, [teardownMachinery])
 
-  // Leaving the room (or unmount) must not strand an active recording.
   const stopRef = useRef(stop)
   stopRef.current = stop
   useEffect(() => {
@@ -403,13 +346,6 @@ export function useCompositeRecorder({
     }
   }, [])
 
-  // Tab close / external navigation mid-recording: unmount cleanup does not
-  // reliably fire there (mobile especially), and even when it runs, the
-  // plain `finish` fetch is killed during unload. sendBeacon rides the
-  // session cookie and survives — the room drops its consent flag and the
-  // recording gets its wall-clock end (finish is idempotent server-side, so
-  // the beacon racing stop()'s fetch is safe). The part still being captured
-  // is lost either way: beacon payloads cap far below a video part.
   useEffect(() => {
     if (status !== 'recording') return
     const onPageHide = () => {

@@ -43,7 +43,7 @@ describe('parseLiveSignal', () => {
     expect(parseLiveSignal(null)).toBeNull()
     expect(parseLiveSignal({})).toBeNull()
     expect(parseLiveSignal({ seq: 1, from_user: '', body: { kind: 'offer' } })).toBeNull()
-    // offer/answer MUST carry a usable description
+
     expect(parseLiveSignal({ seq: 1, from_user: 'a', body: { kind: 'offer' } })).toBeNull()
     expect(
       parseLiveSignal({ seq: 1, from_user: 'a', body: { kind: 'answer', description: { type: 'answer' } } }),

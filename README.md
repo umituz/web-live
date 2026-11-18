@@ -22,7 +22,7 @@ billing and product rules.
 | Mailbox polling loop (1s handshake / 4s steady / 8s hidden floor) | `SignalTransport` — atomic per-client claim endpoints |
 | Star-topology mesh (hub election, epoch-guarded offers, non-trickle ICE, screen-share renegotiation, hub relay) | ICE servers (STUN/TURN list) |
 | Presence heartbeat (8s beat, roster parsing, 409 room-full) | `PresenceTransport` — slot PUT returning the roster |
-| Room-doc sync (4s/8s adaptive poll, 30s backoff, optimistic chat with retry+rollback, debounced notes with edit-lock) | `RoomSyncTransport` — six REST endpoints |
+| Room-doc sync (4s/8s adaptive poll, 30s backoff, optimistic chat with retry+rollback, debounced notes with edit-lock) | `RoomDocTransport` — six REST endpoints |
 | Composite recorder (canvas composite + full-room audio mix, 120s standalone parts, retry chain, sendBeacon finish on pagehide) | `RecorderEndpoints` — start/part/finish + beacon URL |
 | Local media (single-acquisition mic/cam with in-place toggles, screen share) | nothing — pure browser APIs |
 
@@ -100,7 +100,7 @@ connections per participant.
 | `@umituz/web-live/signaling` | `negotiate` pure wire protocol (offer/answer/hello/renegotiate, epoch staleness), `SignalTransport` + HTTP factory, `useSignalMailbox` |
 | `@umituz/web-live/webrtc` | `usePeerMesh` (star-topology engine), `useTransportStats` (quality badge from getStats) |
 | `@umituz/web-live/presence` | `usePresence` heartbeat roster, `PresenceTransport` + HTTP factory |
-| `@umituz/web-live/room` | `useRoomSync` (chat/notes/slides/reactions/screen-slot sync), whiteboard op reducer, room-file validation, caption batcher, broadcast chat feed window |
+| `@umituz/web-live/room` | `useRoomDoc` (chat/notes/slides/reactions/screen-slot sync), whiteboard op reducer, room-file validation, caption batcher, broadcast chat feed window |
 | `@umituz/web-live/media` | `useRoomMedia` (single-acquisition mic/cam/screen), `useVoiceRecorder` |
 | `@umituz/web-live/recorder` | `recording` codec/mime helpers, `useCompositeRecorder` (canvas + audio-mix, 120s parts, pagehide beacon) |
 | `@umituz/web-live/hooks` | `useVisiblePolling` — visibility-adaptive interval (zero cost in hidden tabs, catch-up tick on focus) |

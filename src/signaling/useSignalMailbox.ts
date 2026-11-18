@@ -8,13 +8,6 @@ import {
   SIGNAL_STEADY_POLL_MS,
 } from '../core/constants'
 
-/**
- * WebRTC signaling mailbox client. Polls `transport.consume` on a setTimeout
- * chain (no drift, backs off when the tab hides) and delivers each parsed
- * signal to `onSignal` in seq order. While a handshake is in flight the loop
- * runs at 1s; once everything is connected it settles at 4s — late joiners'
- * offers still arrive, just a beat slower.
- */
 export function useSignalMailbox({
   clientId,
   transport,
@@ -22,12 +15,12 @@ export function useSignalMailbox({
   fast,
   onSignal,
 }: {
-  /** This client's mailbox address (shared with the presence layer). */
+
   clientId: string
-  /** Bound to one room by the caller (see createHttpSignalTransport). */
+
   transport: SignalTransport | null
   enabled: boolean
-  /** true while any peer connection is still negotiating (fast cadence). */
+
   fast: boolean
   onSignal: (signal: LiveSignal) => void
 }): {

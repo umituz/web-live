@@ -35,11 +35,10 @@ describe('normalizeStrokeForWire / denormalizeStrokeForCanvas', () => {
     expect(wire.size).toBeCloseTo(12 / 1600, 4)
     expect(wire.points[0]).toEqual({ x: 0.25, y: 0.1667, pressure: 0.75 })
 
-    // A peer on a smaller window renders the same proportions.
     const back = denormalizeStrokeForCanvas({ ...wire, by: 'cl-1', seq: 3 }, 800, 450)
     expect(back.size).toBeCloseTo(6, 4)
     expect(back.points[0]?.x).toBeCloseTo(200, 4)
-    // 4-decimal wire rounding accumulates ~0.02px at this size — invisible.
+
     expect(back.points[0]?.y).toBeCloseTo(75, 1)
     expect(back.dynamic).toBe(true)
   })
@@ -79,14 +78,13 @@ describe('applyBoardOp', () => {
     board = applyBoardOp(board, { op: 'add', by: 'cl-a', stroke: wireStroke() })!.board
 
     const undone = applyBoardOp(board, { op: 'undo', by: 'cl-a' })!
-    // cl-a's newest (seq 3) is gone; cl-b's stroke survives.
+
     expect(undone.board.strokes.map((s) => s.seq)).toEqual([1, 2])
     expect(undone.record).toEqual({ seq: 4, kind: 'undo', by: 'cl-a', strokeSeq: 3 })
 
-    // A second undo falls back to cl-a's older stroke (still their own ink).
     const again = applyBoardOp(undone.board, { op: 'undo', by: 'cl-a' })!
     expect(again.board.strokes.map((s) => s.seq)).toEqual([2])
-    // Nothing left of one's own → no-op without burning a seq.
+
     const noop = applyBoardOp(again.board, { op: 'undo', by: 'cl-a' })
     expect(noop).toBeNull()
   })
@@ -157,9 +155,9 @@ describe('boardDeltaFor', () => {
 
   it('falls back to full when the client fell behind the journal window', () => {
     const board = boardWith(BOARD_OPS_CAP + 2)
-    // Cursor at 0, but the journal only remembers the last 64 ops.
+
     expect(boardDeltaFor(board, 0, 0).kind).toBe('full')
-    // A cursor inside the window still gets a delta.
+
     const inWindow = board.ops[0]!.seq - 1
     expect(boardDeltaFor(board, 0, inWindow).kind).toBe('delta')
   })

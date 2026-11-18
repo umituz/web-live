@@ -1,5 +1,5 @@
 export * from './transport'
-export * from './useRoomSync'
+export * from './useRoomDoc'
 export * from './boardOps'
 export * from './files'
 export * from './captionBatcher'

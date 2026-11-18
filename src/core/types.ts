@@ -1,36 +1,22 @@
-/**
- * Room contract types shared by every module. These mirror the canonical
- * room-document shapes: the server owns identity and timestamps, the client
- * renders — nothing here is constructed optimistically except the fields the
- * write paths explicitly document.
- */
-
-/**
- * Minimal request shape every HTTP transport needs — `apiFetch` from
- * `@umituz/web-hono/client` satisfies it directly, and a plain `fetch`
- * wrapper can too. Throwing on non-2xx is the contract.
- */
 export type JsonRequest = <T>(
   url: string,
   init: { method: string; json?: unknown },
 ) => Promise<T>
 
-/** One roster entry as returned by a presence heartbeat. */
 export interface RoomParticipant {
-  /** This client's mailbox address (shared with the WebRTC layer). */
+
   clientId: string
-  /** Stable account id (server-minted; two tabs of one user differ in clientId, not userId). */
+
   userId: string
   name: string
   isHost: boolean
   handRaised: boolean
   micOn: boolean
   camOn: boolean
-  /** Server-stamped epoch ms of the last heartbeat. */
+
   at: number
 }
 
-/** Chat line stored in the room doc (server mints id and at). */
 export interface ChatMessage {
   id: string
   at: number
@@ -38,7 +24,6 @@ export interface ChatMessage {
   text: string
 }
 
-/** Emoji reaction flying over the stage (server prunes the window). */
 export interface RoomReaction {
   id: string
   at: number
@@ -46,13 +31,11 @@ export interface RoomReaction {
   emoji: string
 }
 
-/** A slide the host pinned into the room. */
 export interface LessonSlide {
   fileId: string
   title: string
 }
 
-/** The normalized main room doc every participant polls. */
 export interface RoomMainDoc {
   chat: ChatMessage[]
   notes: string
@@ -65,10 +48,6 @@ export interface RoomMainDoc {
   participants: RoomParticipant[]
 }
 
-/**
- * Defensive parser for the polled main doc — servers evolve, clients must not
- * crash on a missing field. Unknown shapes fall back to empty collections.
- */
 export function parseRoomMainDoc(raw: unknown): RoomMainDoc {
   const doc = (typeof raw === 'object' && raw !== null ? raw : {}) as Record<string, unknown>
   return {
@@ -84,7 +63,6 @@ export function parseRoomMainDoc(raw: unknown): RoomMainDoc {
   }
 }
 
-/** Accepts both an array and an object map of participants. */
 export function parseParticipants(raw: unknown): RoomParticipant[] {
   const source = Array.isArray(raw)
     ? raw

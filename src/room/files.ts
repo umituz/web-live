@@ -1,8 +1,3 @@
-// Shared validation for live-room file sharing. The server route and the
-// upload UI both run these, so the allowlist, size cap and name handling
-// live in exactly one place.
-
-/** Mirrors scripts/upload-media.ts CONTENT_TYPES (course material shapes). */
 export const LIVE_FILE_CONTENT_TYPES: Record<string, string> = {
   '.mp3': 'audio/mpeg',
   '.m4a': 'audio/mp4',
@@ -22,7 +17,7 @@ export const LIVE_FILE_CONTENT_TYPES: Record<string, string> = {
 
 export const LIVE_FILE_MAX_BYTES = 25 * 1024 * 1024
 export const LIVE_FILE_MAX_NAME_CHARS = 100
-/** Metadata rows kept on the room's lesson doc. */
+
 export const MAX_ROOM_FILES = 30
 
 export interface LiveRoomFile {
@@ -40,12 +35,11 @@ export type LiveFileValidation =
   | { ok: true; ext: string; contentType: string; name: string }
   | { ok: false; error: 'too_large' | 'bad_type' | 'bad_name' }
 
-/** Strips paths, control characters and quotes; caps the length. */
 export function sanitizeFileName(raw: string): string {
   const base = raw.split(/[/\\]/).pop() ?? ''
-  const cleaned = base
-    // eslint-disable-next-line no-control-regex
-    .replace(/[\u0000-\u001f<>:"|?*]+/g, ' ')
+  const cleaned = Array.from(base)
+    .map((ch) => (ch.charCodeAt(0) < 32 || '<>:"|?*'.includes(ch) ? ' ' : ch))
+    .join('')
     .replace(/["']/g, '')
     .replace(/\s+/g, ' ')
     .trim()
@@ -68,12 +62,10 @@ export function validateLiveFile(rawName: string, size: number): LiveFileValidat
   return { ok: true, ext, contentType, name }
 }
 
-/** R2 object key for a room file — derived, never stored separately. */
 export function liveFileKey(roomId: string, fileId: string, ext: string): string {
   return `live/${roomId}/${fileId}${ext}`
 }
 
-/** Human-readable byte size for the file list. */
 export function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`

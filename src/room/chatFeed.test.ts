@@ -62,7 +62,7 @@ describe('nextFeedCursor', () => {
   it('round-trips: replaying the tail after the cursor is a no-op', () => {
     let window = appendFeed([], [line('a'), line('b'), line('c')])
     expect(nextFeedCursor(window)).toBe('c')
-    // The server replays the tail including the cursor line itself.
+
     window = appendFeed(window, [line('b'), line('c'), line('d')])
     expect(window.map((message) => message.id)).toEqual(['a', 'b', 'c', 'd'])
   })
