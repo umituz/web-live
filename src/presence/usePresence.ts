@@ -36,7 +36,9 @@ export function usePresence({
   const [roomFull, setRoomFull] = useState(false)
 
   const stateRef = useRef({ handRaised, micOn, camOn })
-  stateRef.current = { handRaised, micOn, camOn }
+  useEffect(() => {
+    stateRef.current = { handRaised, micOn, camOn }
+  })
 
   const beat = useCallback(async () => {
     if (!transport) return

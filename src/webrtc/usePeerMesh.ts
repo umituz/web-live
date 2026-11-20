@@ -112,24 +112,26 @@ export function usePeerMesh({
   )
   const isHubRef = useRef(false)
   const hubIdRef = useRef('')
-  const clientIdRef = useRef(clientId)
-  clientIdRef.current = clientId
   const localStreamRef = useRef<MediaStream | null>(localStream)
-  localStreamRef.current = localStream
   const mediaBlockedRef = useRef(mediaBlocked)
-  mediaBlockedRef.current = mediaBlocked
   const screenStreamRef = useRef<MediaStream | null>(screenStream ?? null)
-  screenStreamRef.current = screenStream ?? null
   const relayTrackRef = useRef<MediaStreamTrack | null>(null)
 
   const iceServersRef = useRef<RTCIceServer[]>(iceServers ?? ICE_SERVERS)
-  iceServersRef.current = iceServers ?? ICE_SERVERS
+  useEffect(() => {
+    localStreamRef.current = localStream
+    mediaBlockedRef.current = mediaBlocked
+    screenStreamRef.current = screenStream ?? null
+    iceServersRef.current = iceServers ?? ICE_SERVERS
+  })
 
   const hostClientIds = useMemo(() => electHubClientIds(participants), [participants])
   const hubClientId = hostClientIds[0] ?? ''
-  hubIdRef.current = hubClientId
   const isHub = enabled && hostClientIds[0] === clientId
-  isHubRef.current = isHub
+  useEffect(() => {
+    hubIdRef.current = hubClientId
+    isHubRef.current = isHub
+  })
 
   const bumpRemoteStreams = useCallback(() => {
     setRemoteStreams((prev) => ({ ...prev }))
@@ -320,7 +322,9 @@ export function usePeerMesh({
       removeEndedSenders,
     ],
   )
-  ensurePeerRef.current = ensurePeer
+  useEffect(() => {
+    ensurePeerRef.current = ensurePeer
+  })
 
   const handleOffer = useCallback(
     async (signal: LiveSignal) => {
@@ -401,7 +405,9 @@ export function usePeerMesh({
   const fast = enabled && peersExpected > 0 && !allConnected
 
   const { send } = useSignalMailbox({ clientId, transport, enabled, fast, onSignal: handleSignal })
-  sendRef.current = send
+  useEffect(() => {
+    sendRef.current = send
+  })
 
   useEffect(() => {
     if (!enabled || !isHub) return
@@ -431,7 +437,9 @@ export function usePeerMesh({
     enabled && isHub && screenSharerId && screenSharerId !== clientId
       ? getLastVideoTrack(screenSharerId)
       : null
-  relayTrackRef.current = relayTrack
+  useEffect(() => {
+    relayTrackRef.current = relayTrack
+  })
 
   useEffect(() => {
     if (!enabled || !transport) return

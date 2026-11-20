@@ -8,6 +8,30 @@ import {
   SIGNAL_STEADY_POLL_MS,
 } from '../core/constants'
 
+function startSignalPolling(fast: boolean, poll: () => Promise<void>): () => void {
+  let stopped = false
+  let timer: ReturnType<typeof setTimeout> | undefined
+
+  const schedule = () => {
+    if (stopped) return
+    const base = fast ? SIGNAL_FAST_POLL_MS : SIGNAL_STEADY_POLL_MS
+    const hidden =
+      typeof document !== 'undefined' && document.visibilityState === 'hidden'
+    const delay = hidden ? Math.max(base, SIGNAL_HIDDEN_POLL_MS) : base
+    timer = setTimeout(async () => {
+      await poll()
+      schedule()
+    }, delay)
+  }
+  void poll()
+  schedule()
+
+  return () => {
+    stopped = true
+    clearTimeout(timer)
+  }
+}
+
 export function useSignalMailbox({
   clientId,
   transport,
@@ -27,10 +51,10 @@ export function useSignalMailbox({
   send: (to: string, signal: WirePayload) => Promise<boolean>
 } {
   const onSignalRef = useRef(onSignal)
-  onSignalRef.current = onSignal
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => {
+    onSignalRef.current = onSignal
+  })
   const inFlightRef = useRef(false)
-  const stoppedRef = useRef(true)
 
   const poll = useCallback(async () => {
     if (!transport || inFlightRef.current) return
@@ -48,26 +72,7 @@ export function useSignalMailbox({
 
   useEffect(() => {
     if (!enabled || !transport) return
-    stoppedRef.current = false
-
-    const schedule = () => {
-      if (stoppedRef.current) return
-      const base = fast ? SIGNAL_FAST_POLL_MS : SIGNAL_STEADY_POLL_MS
-      const hidden =
-        typeof document !== 'undefined' && document.visibilityState === 'hidden'
-      const delay = hidden ? Math.max(base, SIGNAL_HIDDEN_POLL_MS) : base
-      timerRef.current = setTimeout(async () => {
-        await poll()
-        schedule()
-      }, delay)
-    }
-    void poll()
-    schedule()
-
-    return () => {
-      stoppedRef.current = true
-      if (timerRef.current) clearTimeout(timerRef.current)
-    }
+    return startSignalPolling(fast, poll)
   }, [enabled, transport, fast, poll])
 
   const send = useCallback(

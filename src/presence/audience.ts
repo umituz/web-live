@@ -74,7 +74,9 @@ export function useAudience({
 }): AudienceState {
   const [members, setMembers] = useState<AudienceMember[]>([])
   const identityRef = useRef(identity)
-  identityRef.current = identity
+  useEffect(() => {
+    identityRef.current = identity
+  })
 
   const beat = useCallback(async () => {
     if (!transport) return

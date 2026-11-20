@@ -75,9 +75,13 @@ export function useCompositeRecorder({
   const [failure, setFailure] = useState<CompositeRecorderFailure | null>(null)
 
   const inputsRef = useRef({ webcamStream, screenStream, remoteStreams, screenSharerId, myClientId })
-  inputsRef.current = { webcamStream, screenStream, remoteStreams, screenSharerId, myClientId }
+  useEffect(() => {
+    inputsRef.current = { webcamStream, screenStream, remoteStreams, screenSharerId, myClientId }
+  })
   const endpointsRef = useRef(endpoints)
-  endpointsRef.current = endpoints
+  useEffect(() => {
+    endpointsRef.current = endpoints
+  })
 
   const activeRef = useRef(false)
   const mimeTypeRef = useRef('')
@@ -339,7 +343,9 @@ export function useCompositeRecorder({
   }, [teardownMachinery])
 
   const stopRef = useRef(stop)
-  stopRef.current = stop
+  useEffect(() => {
+    stopRef.current = stop
+  })
   useEffect(() => {
     return () => {
       stopRef.current()

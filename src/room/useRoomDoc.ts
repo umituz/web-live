@@ -31,6 +31,45 @@ function sameDeck(prev: LessonSlide[], next: LessonSlide[]): boolean {
   return prev.length === next.length && prev.every((slide, i) => slide.fileId === next[i]?.fileId)
 }
 
+type RoomMainDoc = ReturnType<typeof parseRoomMainDoc>
+
+function startRoomDocPolling(
+  transport: RoomDocTransport,
+  onDoc: (doc: RoomMainDoc) => void,
+): () => void {
+  let alive = true
+  let timer: ReturnType<typeof setTimeout> | undefined
+  let failures = 0
+
+  const run = async () => {
+    try {
+      const doc = parseRoomMainDoc(await transport.fetchMain())
+      if (!alive) return
+      failures = 0
+      onDoc(doc)
+      timer = setTimeout(
+        () => void run(),
+        document.visibilityState === 'hidden' ? ROOM_POLL_HIDDEN_MS : ROOM_POLL_MS,
+      )
+    } catch (err) {
+      if (!alive) return
+      const status = (err as { status?: number } | null)?.status
+      if (status === 401 || status === 403) return
+      failures += 1
+      timer = setTimeout(
+        () => void run(),
+        failures >= ROOM_POLL_FAILURE_LIMIT ? ROOM_BACKOFF_MS : ROOM_POLL_MS,
+      )
+    }
+  }
+
+  void run()
+  return () => {
+    alive = false
+    clearTimeout(timer)
+  }
+}
+
 export interface RoomDocState {
   messages: ChatMessage[]
   chatInput: string
@@ -100,66 +139,41 @@ export function useRoomDoc({
     [roomSlides, staticSlides],
   )
   const slidesRef = useRef(slides)
-  slidesRef.current = slides
+  useEffect(() => {
+    slidesRef.current = slides
+  })
 
   useEffect(() => {
     setCurrentSlideIdx((idx) => Math.min(idx, Math.max(0, slides.length - 1)))
   }, [slides.length])
 
+  const applyDoc = useCallback((doc: RoomMainDoc) => {
+    const serverIds = new Set(doc.chat.map((message) => message.id))
+    const pending = pendingChatRef.current.filter((message) => !serverIds.has(message.id))
+    pendingChatRef.current = pending
+    setMessages([...doc.chat, ...pending])
+
+    if (!notesEditingRef.current) {
+      setLessonNotes(doc.notes)
+    }
+    const slideCount = slidesRef.current.length
+    setCurrentSlideIdx(Math.min(Math.max(0, doc.slide), Math.max(0, slideCount - 1)))
+
+    setRoomSlides((prev) => (sameDeck(prev, doc.slides) ? prev : doc.slides))
+    setScreenSharerId(
+      doc.screenSharerId !== null && doc.screenSharerId.length > 0
+        ? doc.screenSharerId
+        : null,
+    )
+    setReactions(doc.reactions)
+    setRecordingActive(doc.recordingActive)
+    setRecordingBy(doc.recordingBy)
+  }, [])
+
   useEffect(() => {
     if (!transport) return
-    let alive = true
-    let timer: ReturnType<typeof setTimeout> | undefined
-    let failures = 0
-
-    const schedule = (delay: number) => {
-      timer = setTimeout(() => void run(), delay)
-    }
-
-    const run = async () => {
-      try {
-        const doc = parseRoomMainDoc(await transport.fetchMain())
-
-        if (!alive) return
-        failures = 0
-
-        const serverIds = new Set(doc.chat.map((message) => message.id))
-        const pending = pendingChatRef.current.filter((message) => !serverIds.has(message.id))
-        pendingChatRef.current = pending
-        setMessages([...doc.chat, ...pending])
-
-        if (!notesEditingRef.current) {
-          setLessonNotes(doc.notes)
-        }
-        const slideCount = slidesRef.current.length
-        setCurrentSlideIdx(Math.min(Math.max(0, doc.slide), Math.max(0, slideCount - 1)))
-
-        setRoomSlides((prev) => (sameDeck(prev, doc.slides) ? prev : doc.slides))
-        setScreenSharerId(
-          doc.screenSharerId !== null && doc.screenSharerId.length > 0
-            ? doc.screenSharerId
-            : null,
-        )
-        setReactions(doc.reactions)
-        setRecordingActive(doc.recordingActive)
-        setRecordingBy(doc.recordingBy)
-
-        schedule(document.visibilityState === 'hidden' ? ROOM_POLL_HIDDEN_MS : ROOM_POLL_MS)
-      } catch (err) {
-        if (!alive) return
-        const status = (err as { status?: number } | null)?.status
-        if (status === 401 || status === 403) return
-        failures += 1
-        schedule(failures >= ROOM_POLL_FAILURE_LIMIT ? ROOM_BACKOFF_MS : ROOM_POLL_MS)
-      }
-    }
-
-    void run()
-    return () => {
-      alive = false
-      if (timer !== undefined) clearTimeout(timer)
-    }
-  }, [transport])
+    return startRoomDocPolling(transport, applyDoc)
+  }, [transport, applyDoc])
 
   const sendMessage = () => {
     if (!chatInput.trim()) return

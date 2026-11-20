@@ -41,10 +41,14 @@ export function useRoomMedia({
   const [acquireTick, setAcquireTick] = useState(0)
 
   const onScreenShareStateRef = useRef(onScreenShareState)
-  onScreenShareStateRef.current = onScreenShareState
+  useEffect(() => {
+    onScreenShareStateRef.current = onScreenShareState
+  })
 
   const screenStreamRef = useRef<MediaStream | null>(null)
-  screenStreamRef.current = screenStream
+  useEffect(() => {
+    screenStreamRef.current = screenStream
+  })
 
   const screenVideoRef = useRef<HTMLVideoElement>(null)
   const webcamVideoRef = useRef<HTMLVideoElement>(null)
