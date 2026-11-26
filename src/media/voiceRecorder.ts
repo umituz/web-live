@@ -37,6 +37,7 @@ function extensionOf(mimeType: string): string {
 export interface VoiceRecorderState {
   status: RecorderStatus
   recording: boolean
+  stream: MediaStream | null
 
   toggle: () => Promise<boolean>
 
@@ -52,6 +53,7 @@ export function useVoiceRecorder(
   } = {},
 ): VoiceRecorderState {
   const [status, setStatus] = useState<RecorderStatus>('idle')
+  const [stream, setStream] = useState<MediaStream | null>(null)
   const mediaRef = useRef<MediaRecorder | null>(null)
   const startingRef = useRef(false)
 
@@ -63,6 +65,7 @@ export function useVoiceRecorder(
     const recorder = mediaRef.current
     mediaRef.current = null
     if (!recorder) return
+    setStream(null)
     if (recorder.state !== 'inactive') recorder.stop()
     transition('stopped')
   }, [transition])
@@ -74,6 +77,7 @@ export function useVoiceRecorder(
     recorder.onstop = null
     if (recorder.state !== 'inactive') recorder.stop()
     recorder.stream.getTracks().forEach((track) => track.stop())
+    setStream(null)
     transition('idle')
   }, [transition])
 
@@ -108,6 +112,7 @@ export function useVoiceRecorder(
       }
       recorder.start()
       mediaRef.current = recorder
+      setStream(stream)
       transition('recording')
       return true
     } catch {
@@ -121,5 +126,5 @@ export function useVoiceRecorder(
   useEffect(() => () => release(), [release])
 
   const recording = status === 'recording'
-  return { status, recording, toggle, stop }
+  return { status, recording, stream, toggle, stop }
 }

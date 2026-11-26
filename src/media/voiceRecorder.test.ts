@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { canTransition, RECORDER_TRANSITIONS, transitionGraphIsClosed } from './voiceRecorder'
+import { createElement } from 'react'
+import { renderToString } from 'react-dom/server'
+import { canTransition, RECORDER_TRANSITIONS, transitionGraphIsClosed, useVoiceRecorder } from './voiceRecorder'
 
 describe('recorder status law', () => {
   it('is a closed graph', () => {
@@ -23,5 +25,23 @@ describe('recorder status law', () => {
     for (const status of Object.keys(RECORDER_TRANSITIONS)) {
       expect(canTransition(RECORDER_TRANSITIONS, status, 'idle')).toBe(true)
     }
+  })
+})
+
+function StateProbe() {
+  const state = useVoiceRecorder()
+  return createElement(
+    'pre',
+    null,
+    JSON.stringify({ status: state.status, recording: state.recording, stream: state.stream }),
+  )
+}
+
+describe('useVoiceRecorder initial state', () => {
+  it('exposes stream alongside status and recording, null before recording starts', () => {
+    const html = renderToString(createElement(StateProbe))
+    expect(html).toContain('&quot;status&quot;:&quot;idle&quot;')
+    expect(html).toContain('&quot;recording&quot;:false')
+    expect(html).toContain('&quot;stream&quot;:null')
   })
 })
